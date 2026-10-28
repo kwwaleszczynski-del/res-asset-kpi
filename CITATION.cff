@@ -14,6 +14,14 @@ authors:
   - family-names: "Waleszczyński"
     given-names: "Konrad"
 version: 0.1.0
+doi: 10.5281/zenodo.23742958
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23742958
+    description: "All versions (concept DOI)"
+  - type: doi
+    value: 10.5281/zenodo.23742959
+    description: "Version 0.1.0"
 date-released: "2026-10-28"
 license: MIT
 repository-code: "https://github.com/kwwaleszczynski-del/res-asset-kpi"

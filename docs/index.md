@@ -31,6 +31,9 @@ package gives them one tested, typed API and reproduces their numbers exactly.
 pip install res-asset-kpi
 ```
 
+Releases are on [PyPI](https://pypi.org/project/res-asset-kpi/) and archived on Zenodo:
+[10.5281/zenodo.23742958](https://doi.org/10.5281/zenodo.23742958).
+
 Python 3.11 or newer; the dependencies are numpy, pandas, scipy and PyYAML.
 
 ## A first example

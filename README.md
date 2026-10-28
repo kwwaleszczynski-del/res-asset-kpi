@@ -2,6 +2,8 @@
 
 [![tests](https://github.com/kwwaleszczynski-del/res-asset-kpi/actions/workflows/ci.yml/badge.svg)](https://github.com/kwwaleszczynski-del/res-asset-kpi/actions/workflows/ci.yml)
 [![docs](https://github.com/kwwaleszczynski-del/res-asset-kpi/actions/workflows/docs.yml/badge.svg)](https://kwwaleszczynski-del.github.io/res-asset-kpi/)
+[![PyPI](https://img.shields.io/pypi/v/res-asset-kpi.svg)](https://pypi.org/project/res-asset-kpi/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23742958.svg)](https://doi.org/10.5281/zenodo.23742958)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Key performance indicators for operating **PV plants, wind turbines and battery storage**, and the contract logic
@@ -119,7 +121,9 @@ the companion projects download.
 
 ## Citing
 
-See [`CITATION.cff`](CITATION.cff); releases are archived on Zenodo with a DOI.
+Please cite the software through its Zenodo DOI, [10.5281/zenodo.23742958](https://doi.org/10.5281/zenodo.23742958)
+(all versions; each release also has its own DOI, e.g. 0.1.0:
+[10.5281/zenodo.23742959](https://doi.org/10.5281/zenodo.23742959)). See also [`CITATION.cff`](CITATION.cff).
 
 ## License
 
