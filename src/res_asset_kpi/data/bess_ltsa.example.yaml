@@ -1,0 +1,48 @@
+# ILLUSTRATIVE long-term service agreement (LTSA) terms of a grid battery: availability, RTE and capacity
+# guarantees and liquidated damages. Placeholders that show the mechanics, not a reading of any contract; check
+# every value against the actual agreement, which always prevails. Not legal advice.
+name: Illustrative battery LTSA
+asset: bess
+currency: EUR
+period: contract_year
+contract_start: 2025-01-01
+
+# event category -> deemed_available | excluded | allowance | counted (res_asset_kpi.bess.availability)
+event_treatments:
+  grid_operator_instruction: deemed_available
+  grid_outage: deemed_available
+  owner_request: deemed_available
+  force_majeure: excluded
+  capacity_test: excluded
+  planned_maintenance: allowance
+  forced_outage: counted
+planned_maintenance:
+  allowance_h: 16               # per year, pro-rated to shorter periods
+annual_cap: 500000.0            # all damages in a contract year (e.g. 50 % of an annual fee of 1 000 000)
+
+guarantees:
+  availability:
+    basis: time                 # time | capacity | energy
+    guaranteed: 0.97
+    parameters: {threshold: 0.95, directions: [discharge, charge], missing_data: excluded,
+                 power_mw: 50.0, energy_mwh: 100.0}
+    damages: {method: per_point, rate_per_pp: 20000.0}
+
+  rte:
+    basis: incl_aux             # incl_aux | excl_aux
+    guaranteed: 0.85
+    parameters: {window: M, min_efc: 5}
+    damages: {method: rte_energy_cost, price_per_mwh: 90.0}
+
+  capacity:
+    basis: warranty_retention
+    guaranteed: 100.0           # reference energy, MWh; the guaranteed share follows the retention curve
+    parameters:
+      retention_years: [0, 1, 2, 3, 5, 10, 15]
+      retention_soh: [1.00, 0.97, 0.95, 0.935, 0.91, 0.85, 0.78]
+      efc_per_year: 365         # equivalent age max(years, EFC / efc_per_year)
+      test_power_mw: 50.0
+      t_ref_c: 25.0
+      temp_coeff_per_k: 0.003
+      decision_rule: guard_band
+    damages: {method: per_mwh, rate_per_mwh: 25000.0}

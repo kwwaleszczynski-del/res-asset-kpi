@@ -1,0 +1,13 @@
+# Long export (timestamp, device_id, signal, value) whose signal names and units differ from the canonical ones.
+format: long
+timestamp_column: timestamp
+timezone: Europe/Warsaw
+label: start
+step: 15min
+signals:
+  P_POI_kW:   {signal: p_meter, unit: kW}
+  P_AUX_kW:   {signal: p_aux, unit: kW}
+  SOC_PCT:    {signal: soc, unit: "%"}
+  T_AMB_F:    {signal: t_amb, unit: degF}
+devices:
+  BMS-01: BESS

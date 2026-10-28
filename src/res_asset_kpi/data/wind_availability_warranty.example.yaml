@@ -1,0 +1,30 @@
+# ILLUSTRATIVE availability warranty of a wind turbine service agreement, for testing the calculation. Not taken
+# from any real agreement: the treatment of each category, the allowance, the damages formula and the cap must be
+# checked against the actual contract, which always prevails. Not legal advice.
+name: Illustrative wind turbine availability warranty
+asset: wind
+currency: EUR
+period: year
+
+# IEC 61400-26 information category -> available | unavailable | excluded (res_asset_kpi.wind.availability)
+event_treatments:
+  full_performance: available
+  partial_performance: available
+  technical_standby: available
+  environmental: excluded
+  requested: excluded
+  electrical: excluded
+  scheduled_maintenance: unavailable
+  planned_corrective: unavailable
+  forced_outage: unavailable
+  no_info: available
+planned_maintenance:
+  allowance_h: 60               # scheduled maintenance hours per turbine and year excused
+
+guarantees:
+  availability:
+    basis: time
+    guaranteed: 0.97
+    damages:                    # (guaranteed - measured) x potential energy x price
+      method: energy
+      price_per_mwh: 80.0

@@ -1,0 +1,15 @@
+# Wide logger export (one row per time stamp, one column per signal) mapped to canonical signals.
+# Column names are placeholders; see res_asset_kpi.schema for the list of canonical signals and units.
+format: wide
+timestamp_column: Timestamp
+timezone: Europe/Warsaw         # naive local time with DST; ISO strings with offsets are read exactly
+label: end                      # the logger stamps the end of each average
+step: 15min                     # output grid: 5min, 10min, 15min, 30min or 1h
+columns:
+  "Irradiance POA [W/m2]": {signal: poa, unit: W/m2}
+  "Ambient temp [C]":      {signal: t_amb, unit: degC}
+  "Module temp [C]":       {signal: t_mod, unit: degC}
+  "INV01 Pac [W]":         {device: INV01, signal: p_ac, unit: W}
+  "INV02 Pac [W]":         {device: INV02, signal: p_ac, unit: W}
+  "PPC limit [%]":         {signal: setpoint, unit: "%"}
+  "Meter export [kWh]":    {device: METER, signal: e_export, unit: kWh}

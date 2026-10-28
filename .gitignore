@@ -10,6 +10,6 @@ coverage.xml
 build/
 dist/
 site/
-data/
-out/
+/data/
+/out/
 *.log
