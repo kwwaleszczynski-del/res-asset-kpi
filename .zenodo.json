@@ -1,0 +1,33 @@
+{
+  "title": "res-asset-kpi: key performance indicators for operating PV, wind and battery assets",
+  "upload_type": "software",
+  "description": "<p>A Python library of key performance indicators for operating renewable assets: performance ratio, temperature-corrected and weather-corrected PR, availability and a budget-to-actual energy bridge for PV plants; availability by IEC 61400-26 categories, power curves by the method of bins and reliability indicators (MTBF, MTTR, Crow-AMSAA) for wind turbines; state-of-charge-corrected round-trip efficiency, LTSA availability, rainflow cycles and capacity tests with uncertainty for battery storage; and contract guarantees and liquidated damages in YAML.</p><p>Implemented from public descriptions of the standards; not a certified implementation. Documentation: https://kwwaleszczynski-del.github.io/res-asset-kpi/</p>",
+  "creators": [
+    {
+      "name": "Waleszczyński, Konrad"
+    }
+  ],
+  "license": "MIT",
+  "access_right": "open",
+  "keywords": [
+    "renewable energy",
+    "photovoltaics",
+    "wind energy",
+    "battery energy storage",
+    "asset management",
+    "performance ratio",
+    "availability",
+    "power curve",
+    "reliability",
+    "round-trip efficiency"
+  ],
+  "related_identifiers": [
+    {"identifier": "https://kwwaleszczynski-del.github.io/res-asset-kpi/", "relation": "isDocumentedBy", "scheme": "url"},
+    {"identifier": "https://github.com/kwwaleszczynski-del/pv-budget-bridge", "relation": "isDerivedFrom", "scheme": "url"},
+    {"identifier": "https://github.com/kwwaleszczynski-del/pv-outage-classifier", "relation": "isDerivedFrom", "scheme": "url"},
+    {"identifier": "https://github.com/kwwaleszczynski-del/wind-downtime-availability", "relation": "isDerivedFrom", "scheme": "url"},
+    {"identifier": "https://github.com/kwwaleszczynski-del/wind-power-curve-kelmarsh", "relation": "isDerivedFrom", "scheme": "url"},
+    {"identifier": "https://github.com/kwwaleszczynski-del/wind-om-reliability", "relation": "isDerivedFrom", "scheme": "url"},
+    {"identifier": "https://github.com/kwwaleszczynski-del/bess-ops-warranty", "relation": "isDerivedFrom", "scheme": "url"}
+  ]
+}

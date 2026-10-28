@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+type: software
+title: "res-asset-kpi: key performance indicators for operating PV, wind and battery assets"
+abstract: >-
+  A Python library of key performance indicators for operating renewable assets: performance ratio,
+  temperature-corrected and weather-corrected PR, availability and a budget-to-actual energy bridge for PV
+  plants; availability by IEC 61400-26 categories, power curves by the method of bins and reliability
+  indicators (MTBF, MTTR, Crow-AMSAA) for wind turbines; state-of-charge-corrected round-trip efficiency,
+  LTSA availability, rainflow cycles and capacity tests with uncertainty for battery storage; and contract
+  guarantees and liquidated damages in YAML. Implemented from public descriptions of the standards; not a
+  certified implementation.
+authors:
+  - family-names: "Waleszczyński"
+    given-names: "Konrad"
+version: 0.1.0
+date-released: "2026-10-28"
+license: MIT
+repository-code: "https://github.com/kwwaleszczynski-del/res-asset-kpi"
+url: "https://kwwaleszczynski-del.github.io/res-asset-kpi/"
+keywords:
+  - renewable energy
+  - photovoltaics
+  - wind energy
+  - battery energy storage
+  - asset management
+  - performance ratio
+  - availability
+  - power curve
+  - reliability
+  - round-trip efficiency

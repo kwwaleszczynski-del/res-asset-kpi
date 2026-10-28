@@ -1,0 +1,84 @@
+site_name: res-asset-kpi
+site_description: Key performance indicators for operating PV, wind and battery assets
+site_url: https://kwwaleszczynski-del.github.io/res-asset-kpi/
+repo_url: https://github.com/kwwaleszczynski-del/res-asset-kpi
+repo_name: kwwaleszczynski-del/res-asset-kpi
+edit_uri: ""
+copyright: Code MIT licensed. Not a certified implementation of any IEC standard.
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Light mode
+
+nav:
+  - Home: index.md
+  - Guide:
+      - Data, time and units: guide/data.md
+      - Quality flags: guide/quality.md
+  - Methods:
+      - PV: methods/pv.md
+      - Wind: methods/wind.md
+      - Battery storage: methods/bess.md
+      - Contracts: methods/contracts.md
+  - Examples:
+      - PVDAQ system 34: examples/pvdaq.md
+      - Kelmarsh wind farm: examples/kelmarsh.md
+  - Validation: validation.md
+  - API reference:
+      - Data and time: api/core.md
+      - PV: api/pv.md
+      - Wind: api/wind.md
+      - Battery storage: api/bess.md
+      - Contracts: api/contracts.md
+  - Development: development.md
+  - Citing: citing.md
+  - Changelog: changelog.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            merge_init_into_class: true
+            show_signature_annotations: true
+            separate_signature: true
+            filters: ["!^_"]
