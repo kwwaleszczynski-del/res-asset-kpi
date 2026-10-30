@@ -119,6 +119,19 @@ the companion projects download.
 | [wind-om-reliability](https://github.com/kwwaleszczynski-del/wind-om-reliability) | MTBF, MTTR, Crow-AMSAA, Laplace |
 | [bess-ops-warranty](https://github.com/kwwaleszczynski-del/bess-ops-warranty) | RTE, LTSA availability, cycles, capacity tests, damages |
 
+## Used by
+
+These projects install the library from PyPI and compute their indicators with it. The switch left every figure in
+their READMEs unchanged.
+
+| Project | Uses |
+|---|---|
+| [pv-budget-bridge](https://github.com/kwwaleszczynski-del/pv-budget-bridge) | `pv.pr_terms`, `pv.availability`, `pv.shapley_product`, `contracts.assess` |
+| [wind-downtime-availability](https://github.com/kwwaleszczynski-del/wind-downtime-availability) | `wind.category_totals`, `wind.availability` |
+| [wind-power-curve-kelmarsh](https://github.com/kwwaleszczynski-del/wind-power-curve-kelmarsh) | `wind.air_density`, `wind.bin_power_curve`, `wind.aep_rayleigh` |
+| [wind-om-reliability](https://github.com/kwwaleszczynski-del/wind-om-reliability) | `wind.operating_time`, `wind.mtbf_mttr`, `wind.crow_amsaa`, `intervals` |
+| [bess-ops-warranty](https://github.com/kwwaleszczynski-del/bess-ops-warranty) | `bess.interval_flows`, `bess.corrected_rte`, `bess.ltsa_availability`, `bess.rainflow`, `bess.evaluate_capacity_test`, `contracts.damages_amount` |
+
 ## Citing
 
 Please cite the software through its Zenodo DOI, [10.5281/zenodo.23742958](https://doi.org/10.5281/zenodo.23742958)
