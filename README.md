@@ -13,7 +13,8 @@ Asset managers, O&M contractors and lenders' engineers compute the same indicato
 performance ratio, availability as the contract defines it, the bridge from budget to actual production, power
 curves, failure rates, round-trip efficiency, cycles. This library writes them once, with explicit units, explicit
 time handling (UTC grids, local reporting periods, the DST hours) and a test against a hand-worked example for
-every formula. Its code comes from six open analysis projects and reproduces their results exactly
+every formula. Its code comes from six open analysis projects; a regression check against their original code,
+before they switched to the library, reproduces their results
 ([validation](https://kwwaleszczynski-del.github.io/res-asset-kpi/validation/)).
 
 > [!WARNING]
@@ -105,8 +106,10 @@ the companion projects download.
 - Hand-worked tests for every formula; property tests with Hypothesis (the energy bridge closes, availabilities
   stay in $`[0, 1]`$, rainflow preserves the path length, interval operations count every moment once).
 - Coverage above 90 %, CI on Python 3.11-3.13 and on the oldest supported dependencies.
-- [`validation/parity.py`](validation/parity.py) reproduces the source projects' results: 41 checks over about
-  one million values, largest relative difference $`1.3 \cdot 10^{-13}`$.
+- [`validation/parity.py`](validation/parity.py) compares the library with the original code of the source
+  projects, pinned to the commits before they imported it: 41 checks over about one million values, largest
+  relative difference $`1.3 \cdot 10^{-13}`$. A regression check of the extraction, not an independent
+  validation of the methods.
 
 ## Source projects
 

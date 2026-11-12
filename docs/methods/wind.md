@@ -32,7 +32,9 @@ $$
 
 with the energy sums taken over the categories that are not excluded. A **maintenance allowance** (hours per
 turbine and year) moves scheduled maintenance from unavailable to excluded until it is used up; its lost energy is
-excused in the same proportion. Two illustrative presets ship with the library: `iec_operational` (every operative
+excused in the same proportion. It is scaled by the turbine-years the totals cover, by default their hours / 8760:
+a fleet of six turbines over a year gets six allowances, a single turbine-month a twelfth of one
+(`n_turbine_years` overrides it). Two illustrative presets ship with the library: `iec_operational` (every operative
 state available, missing information excluded) and `oem_warranty` (grid, environment and requested stops
 excused, scheduled maintenance allowance 60 h, missing information counted as available). `wind.remap` re-labels
 categories, which shows what a misclassification costs: counting grid stops as turbine faults lowers a warranty

@@ -63,8 +63,8 @@ def availability_by_year(stops: pd.DataFrame) -> pd.DataFrame:
             totals = pd.DataFrame({"category": [*hours.index, "full_performance"],
                                    "hours": [*hours.to_numpy(), (b - a).total_seconds() / 3600 - hours.sum()]})
             for contract in ("iec_operational", "oem_warranty"):
-                r = wind.availability(totals, contract, allowance_h=wind.MAINTENANCE_ALLOWANCE_H[contract]
-                                      * (b - a).total_seconds() / 3600 / 8760)
+                # the allowance is per turbine-year; the library pro-rates it to the hours of the totals
+                r = wind.availability(totals, contract, allowance_h=wind.MAINTENANCE_ALLOWANCE_H[contract])
                 rows.append({"turbine_id": tid, "year": year, "contract": contract, "time": r.time,
                              "unavailable_h": r.unavailable_h})
     return pd.DataFrame(rows)

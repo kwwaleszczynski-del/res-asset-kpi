@@ -11,7 +11,9 @@ A_energy = 1 - E_lost,unavailable / (E_actual + E_lost)          over the catego
 ```
 
 A maintenance allowance (hours per turbine and year) moves scheduled maintenance from unavailable to excluded
-until it is used up; its lost energy is excused in proportion.
+until it is used up; its lost energy is excused in proportion. The allowance is scaled by the turbine-years the
+totals cover, by default their hours / 8760, so that a fleet-year gets one allowance per turbine and a month a
+twelfth of it.
 
 The category list follows the top levels of the standard's information model; the standard's tree is finer
 (e.g. "out of environmental specification" covers low wind, high wind, icing and temperature). The two contract
@@ -41,6 +43,7 @@ __all__ = [
 ]
 
 AVAILABLE, UNAVAILABLE, EXCLUDED = "available", "unavailable", "excluded"
+_YEAR_H = 8760.0  # hours of one turbine-year for the allowance
 
 CATEGORIES: dict[str, str] = {
     "full_performance": "Full performance",
@@ -164,7 +167,7 @@ def availability(
     totals: pd.DataFrame,
     contract: str | Mapping[str, str] = "iec_operational",
     allowance_h: float = 0.0,
-    n_turbine_years: float = 1.0,
+    n_turbine_years: float | None = None,
 ) -> WindAvailability:
     """Time-based and energy-based availability from category totals of one group.
 
@@ -178,8 +181,9 @@ def availability(
         ``available`` / ``unavailable`` / ``excluded`` covering every category present.
     allowance_h : float, default 0.0
         Scheduled maintenance allowance, hours per turbine and year.
-    n_turbine_years : float, default 1.0
-        Turbine-years the totals cover (scales the allowance).
+    n_turbine_years : float, optional
+        Turbine-years the totals cover (scales the allowance); by default the total hours of all categories
+        / 8760, e.g. 6 for six turbines over a year, 0.085 for one turbine-month.
 
     Returns
     -------
@@ -211,7 +215,8 @@ def availability(
     unavail_h = float(hours[role == UNAVAILABLE].sum())
     avail_h = float(hours[role == AVAILABLE].sum())
     sm = float(hours.get("scheduled_maintenance", 0.0)) if roles.get("scheduled_maintenance") == UNAVAILABLE else 0.0
-    excused = min(sm, allowance_h * n_turbine_years)
+    years = float(hours.sum()) / _YEAR_H if n_turbine_years is None else n_turbine_years
+    excused = min(sm, allowance_h * years)
     unavail_h -= excused
     lost_un = float(lost[role == UNAVAILABLE].sum())
     if sm > 0 and excused > 0:

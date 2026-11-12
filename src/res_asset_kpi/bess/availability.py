@@ -19,8 +19,9 @@ Events from the operator's log decide how an interval counts:
 
 The availability of a period is ``A = sum(a_i dt) / sum(dt)`` over the intervals not excluded. Intervals without data
 and without an event are excluded, counted as available or as unavailable (``missing_data``). When events overlap, the
-treatment listed first in [`PRIORITY`][res_asset_kpi.bess.availability.PRIORITY] wins. The allowance is given per year
-and pro-rated to the length of the period.
+treatment listed first in [`PRIORITY`][res_asset_kpi.bess.availability.PRIORITY] wins. An event that covers only part
+of an interval counts for that part: an outage that a grid instruction excuses from 02:05 leaves five minutes of the
+02:00 interval counted. The allowance is given per year and pro-rated to the length of the period.
 
 Which categories exist and how each is treated is contract-specific: the example in
 ``res_asset_kpi/data/bess_ltsa.example.yaml`` is an illustration, not a reading of any LTSA.
@@ -36,6 +37,7 @@ import pandas as pd
 from numpy.typing import ArrayLike
 
 from res_asset_kpi import timeseries
+from res_asset_kpi.intervals import to_ns, union
 
 __all__ = ["PRIORITY", "TREATMENTS", "interval_treatment", "ltsa_availability", "measured_availability"]
 
@@ -110,7 +112,10 @@ def measured_availability(
 
 def interval_treatment(index: pd.DatetimeIndex, events: pd.DataFrame | None,
                        treatments: Mapping[str, str]) -> pd.DataFrame:
-    """Event category and its treatment for every interval (by the interval's start time).
+    """Event category and its treatment for every interval, labelled by the interval's start time.
+
+    A label for display and grouping; [`ltsa_availability`][res_asset_kpi.bess.availability.ltsa_availability]
+    weighs events by the share of each interval they cover instead.
 
     Parameters
     ----------
@@ -142,6 +147,43 @@ def interval_treatment(index: pd.DatetimeIndex, events: pd.DataFrame | None,
             cat[(index >= ev.start) & (index < ev.end)] = ev.category
     treat = cat.map(lambda c: treatments.get(c, "counted") if isinstance(c, str) else "counted")
     return pd.DataFrame({"category": cat, "treatment": treat.astype(str)}, index=index)
+
+
+def _covered_share(starts: np.ndarray, step: int, ev_start: np.ndarray, ev_end: np.ndarray) -> np.ndarray:
+    """Share of each interval [t, t + step) covered by the union of the events (int64 nanoseconds)."""
+    s, e = union(ev_start, ev_end)
+    if len(s) == 0:
+        return np.zeros(len(starts))
+    length = e - s
+    cum = np.r_[0, np.cumsum(length)]
+
+    def covered_before(t: np.ndarray) -> np.ndarray:
+        k = np.searchsorted(s, t, side="right") - 1
+        out = np.zeros(len(t))
+        ok = k >= 0
+        out[ok] = cum[k[ok]] + np.minimum(t[ok] - s[k[ok]], length[k[ok]])
+        return out
+
+    return np.clip((covered_before(starts + step) - covered_before(starts)) / step, 0.0, 1.0)
+
+
+def _treatment_shares(index: pd.DatetimeIndex, step_h: float, events: pd.DataFrame | None,
+                      treatments: Mapping[str, str]) -> dict[str, np.ndarray]:
+    """Share of every interval under each treatment, overlaps resolved by PRIORITY."""
+    shares = {k: np.zeros(len(index)) for k in TREATMENTS[:-1]}
+    if events is None or events.empty:
+        return shares
+    starts = to_ns(index)
+    step = int(round(step_h * 3.6e12))
+    treat = events["category"].map(treatments).to_numpy(dtype=object)
+    ev_s, ev_e = to_ns(events["start"]), to_ns(events["end"])
+    before = np.zeros(len(index))
+    for k, name in enumerate(TREATMENTS[:-1]):
+        sel = np.isin(treat, TREATMENTS[:k + 1])
+        cov = _covered_share(starts, step, ev_s[sel], ev_e[sel])
+        shares[name] = np.clip(cov - before, 0.0, 1.0)
+        before = cov
+    return shares
 
 
 def ltsa_availability(
@@ -195,40 +237,42 @@ def ltsa_availability(
     """
     idx = pd.DatetimeIndex(measured.index)
     dt_h = timeseries.interval_hours(idx)
-    iv = interval_treatment(idx, events, treatments or {})
+    interval_treatment(idx, events, treatments or {})  # validates categories and event bounds
+    shares = _treatment_shares(idx, dt_h, events, treatments or {})
     labels = np.full(len(idx), "all", dtype=object) if periods is None else np.asarray(periods)
     if len(labels) != len(idx):
         raise ValueError("periods must have one label per interval")
     meas_all = measured.to_numpy(dtype=float)
-    treat_all = iv["treatment"].to_numpy(dtype=object)
+    fill = {"available": 1.0, "unavailable": 0.0}.get(missing_data)
     rows = []
     for key in pd.unique(labels):
         sel = labels == key
         dt = np.full(int(sel.sum()), dt_h)
         hours = float(dt.sum())
-        treat, meas = treat_all[sel], meas_all[sel]
+        meas = meas_all[sel]
+        f_ex, f_da, f_al = (shares[k][sel] for k in TREATMENTS[:-1])
         allowance = planned_allowance_h * hours / 8760.0
-        is_allow = treat == "allowance"
-        used = np.cumsum(np.where(is_allow, dt, 0.0))
-        allow_excluded = is_allow & (used <= allowance + 1e-9)
-        allow_counted = is_allow & ~allow_excluded
-        excluded = (treat == "excluded") | allow_excluded
-        deemed = treat == "deemed_available"
-        counted = ~excluded & ~deemed
-        missing = counted & np.isnan(meas)
-        value = np.where(deemed, 1.0, meas)
-        if missing_data == "excluded":
-            excluded = excluded | missing
+        al_h = f_al * dt
+        within = (al_h > 0) & (np.cumsum(al_h) <= allowance + 1e-9)
+        al_ex_h = np.where(within, al_h, 0.0)
+        al_ct_h = al_h - al_ex_h
+        ex_h = f_ex * dt + al_ex_h
+        da_h = f_da * dt
+        ct_h = np.clip(1.0 - f_ex - f_da - f_al, 0.0, 1.0) * dt + al_ct_h
+        missing = np.isnan(meas)
+        miss_h = np.where(missing, ct_h, 0.0)
+        if fill is None:  # missing data excluded
+            ex_h = ex_h + miss_h
+            ct_h = ct_h - miss_h
+            num = float(da_h.sum() + (np.nan_to_num(meas) * ct_h).sum())
         else:
-            value = np.where(missing, 1.0 if missing_data == "available" else 0.0, value)
-        base = ~excluded
-        denom = float(dt[base].sum())
-        num = float((np.nan_to_num(value[base]) * dt[base]).sum())
-        rows.append({"period": key, "hours": hours, "hours_excluded": float(dt[excluded].sum()),
-                     "hours_deemed_available": float(dt[deemed].sum()),
-                     "hours_planned_in_allowance": float(dt[allow_excluded].sum()),
-                     "hours_planned_counted": float(dt[allow_counted].sum()),
-                     "hours_missing": float(dt[missing].sum()), "equivalent_unavailable_hours": denom - num,
+            num = float(da_h.sum() + (np.where(missing, fill, meas) * ct_h).sum())
+        denom = float(da_h.sum() + ct_h.sum())
+        rows.append({"period": key, "hours": hours, "hours_excluded": float(ex_h.sum()),
+                     "hours_deemed_available": float(da_h.sum()),
+                     "hours_planned_in_allowance": float(al_ex_h.sum()),
+                     "hours_planned_counted": float(al_ct_h.sum()),
+                     "hours_missing": float(miss_h.sum()), "equivalent_unavailable_hours": denom - num,
                      "availability": num / denom if denom > 0 else np.nan,
                      "guaranteed": np.nan if guaranteed is None else guaranteed})
     return pd.DataFrame(rows).set_index("period")

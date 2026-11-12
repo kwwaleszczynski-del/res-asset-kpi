@@ -29,7 +29,9 @@ $$
 Over the typical year itself \(\mathrm{PR}_\mathrm{wc} = \mathrm{PR}\) exactly when the plant follows the
 temperature model; month by month it removes the seasonal swing that \(\mathrm{PR}\) shows and that
 \(\mathrm{PR}_{25}\) overcorrects. Intervals with a missing power or irradiance are left out of numerator and
-denominator; when cell temperatures are given, intervals without one are left out of all three ratios.
+denominator; when cell temperatures are given, intervals without one are left out of all three ratios. Negative
+power at night (the plant's own consumption) counts in \(E\) unless a `mask` (e.g. irradiance above 50 W/m²)
+restricts the ratio to daylight operation.
 
 Cell temperature models: from a back-of-module sensor \(T_c = T_m + G/1000 \cdot \Delta T\) (King et al., 2004,
 SAND2004-3535) and the PVsyst heat balance \(T_c = T_a + \alpha G (1 - \eta) / (U_c + U_v v)\).
@@ -59,7 +61,12 @@ $$
 - **Planned maintenance** is excluded until its capacity-weighted daylight hours in the period exceed the
   allowance; afterwards it counts as downtime.
 - The **energy basis** weighs each stopped interval by the energy the unit was expected to produce (after soiling,
-  snow and clipping), so an outage on a sunny noon costs more than one at dawn.
+  snow and clipping), so an outage on a sunny noon costs more than one at dawn. A counted interval without
+  expected power makes the energy availability of its period NaN (`expected_missing_h`) rather than a loss of
+  zero.
+- **Missing irradiance** leaves an interval unclassified: it is left out and reported in `poa_missing_h`
+  (capacity-weighted hours), or counted as daylight with `missing_poa="daylight"`, which a contract may require.
+  Treating it as night would hide a stop that happens during a sensor gap.
 
 ## Energy bridge
 

@@ -114,21 +114,23 @@ SIGNALS: dict[str, SignalInfo] = {
 
 @dataclass(frozen=True)
 class ColumnSpec:
-    """What one column of a wide table holds."""
+    """What one column of a wide table holds (``sign: -1`` flips a meter that counts import as positive)."""
 
     signal: str
     device: str | None = None
     unit: str | None = None
     scale: float = 1.0
+    sign: int = 1
 
 
 @dataclass(frozen=True)
 class SignalSpec:
-    """How a signal name of a long table maps to a canonical signal."""
+    """How a signal name of a long table maps to a canonical signal (``sign: -1`` flips its sign)."""
 
     signal: str
     unit: str | None = None
     scale: float = 1.0
+    sign: int = 1
 
 
 @dataclass(frozen=True)
@@ -178,6 +180,8 @@ def _spec(cls: type[Any], name: str, raw: Any) -> Any:
     if unknown:
         raise SchemaError(f"{name}: unknown keys {sorted(unknown)}; allowed {sorted(allowed)}")
     spec = cls(**raw)
+    if spec.sign not in (1, -1):
+        raise SchemaError(f"{name}: sign must be 1 or -1")
     if spec.signal not in SIGNALS:
         raise SchemaError(f"{name}: {spec.signal!r} is not a canonical signal; known: {sorted(SIGNALS)}")
     if spec.unit is not None and units.dimension(spec.unit) != units.dimension(SIGNALS[spec.signal].unit):
@@ -269,8 +273,8 @@ def validate_long(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _to_canonical(values: pd.Series, signal: str, unit: str | None, scale: float) -> pd.Series:
-    v = values * scale
+def _to_canonical(values: pd.Series, signal: str, unit: str | None, scale: float, sign: int = 1) -> pd.Series:
+    v = values * (scale * sign)
     return units.convert(v, unit, SIGNALS[signal].unit) if unit is not None else v
 
 
@@ -314,7 +318,7 @@ def read(raw: pd.DataFrame, mapping: Mapping | dict[str, Any] | str | Path | Non
                 "timestamp": raw[m.timestamp_column].to_numpy(),
                 "device_id": spec.device or m.plant_device,
                 "signal": spec.signal,
-                "value": _to_canonical(values, spec.signal, spec.unit, spec.scale).to_numpy(),
+                "value": _to_canonical(values, spec.signal, spec.unit, spec.scale, spec.sign).to_numpy(),
             }))
         long = pd.concat(frames, ignore_index=True)
     else:
@@ -330,7 +334,8 @@ def read(raw: pd.DataFrame, mapping: Mapping | dict[str, Any] | str | Path | Non
         for name, sspec in m.signals.items():
             sel = original == name
             if sel.any():
-                long.loc[sel, "value"] = _to_canonical(long.loc[sel, "value"], sspec.signal, sspec.unit, sspec.scale)
+                long.loc[sel, "value"] = _to_canonical(long.loc[sel, "value"], sspec.signal, sspec.unit, sspec.scale,
+                                                       sspec.sign)
                 long.loc[sel, "signal"] = sspec.signal
     long = validate_long(long)
     long["timestamp"] = timeseries.to_utc(long["timestamp"], m.timezone, long[["device_id", "signal"]])
@@ -345,6 +350,7 @@ def to_wide(
     long: pd.DataFrame,
     step: str | pd.Timedelta | None = None,
     label: timeseries.Label | None = None,
+    min_share: float = 1.0,
 ) -> pd.DataFrame:
     """Put a tidy long table on one regular UTC grid, one column per ``(device, signal)``.
 
@@ -359,6 +365,9 @@ def to_wide(
         Output interval; default: ``long.attrs["step"]`` or the coarsest interval found.
     label : {"start", "end", "center"}, optional
         Default: ``long.attrs["label"]`` or ``"start"``.
+    min_share : float, default 1.0
+        Share of the source intervals a coarser interval needs for a mean (sums need all); see
+        [`regularise`][res_asset_kpi.timeseries.regularise].
 
     Returns
     -------
@@ -368,11 +377,13 @@ def to_wide(
 
     Examples
     --------
-    >>> long = pd.DataFrame({"timestamp": pd.date_range("2024-07-01 10:00", periods=4, freq="5min", tz="UTC"),
-    ...                      "device_id": "INV1", "signal": "p_ac", "value": [1.0, 2.0, 3.0, 4.0]})
+    >>> long = pd.DataFrame({"timestamp": pd.date_range("2024-07-01 10:00", periods=6, freq="5min", tz="UTC"),
+    ...                      "device_id": "INV1", "signal": "p_ac", "value": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]})
     >>> wide = to_wide(long, "15min")
     >>> wide[("INV1", "p_ac")].tolist()
-    [2.0, 4.0]
+    [2.0, 5.0]
+    >>> to_wide(long.iloc[:4], "15min")[("INV1", "p_ac")].tolist()   # one of three values: not a 15-minute mean
+    [2.0, nan]
     >>> wide.index[0]
     Timestamp('2024-07-01 10:00:00+0000', tz='UTC')
     """
@@ -391,7 +402,8 @@ def to_wide(
     for (dev, sig), g in df.groupby(["device_id", "signal"], sort=True):
         s = pd.Series(g["value"].to_numpy(float), index=pd.DatetimeIndex(g["timestamp"]))
         series[(dev, sig)] = timeseries.regularise(
-            s, target, source_step=steps[(dev, sig)] or target, label=lab, how=SIGNALS[sig].aggregation
+            s, target, source_step=steps[(dev, sig)] or target, label=lab, how=SIGNALS[sig].aggregation,
+            min_share=min_share,
         )
     starts = [s.index.min() for s in series.values() if len(s)]
     ends = [s.index.max() for s in series.values() if len(s)]

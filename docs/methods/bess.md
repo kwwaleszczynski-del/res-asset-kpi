@@ -24,10 +24,17 @@ $$
 $$
 
 Energy left in store is worth \(\eta \Delta E\) at the meter; energy taken from store would have needed
-\(|\Delta E| / \eta\) to put back. \(\eta\) is given, or found as \(\sqrt{\mathrm{RTE}}\) of the whole record by
+\(|\Delta E| / \eta\) to put back. \(\eta\) is given, or found as \(\sqrt{\mathrm{RTE}}\) of the complete windows by
 fixed-point iteration. A window is assessed (`valid`) when it has enough equivalent full cycles (0.3 a day,
-5 a month by default) and data, because on days with little throughput the auxiliaries and the SoC resolution
-dominate the ratio.
+5 a month by default), because on days with little throughput the auxiliaries and the SoC resolution dominate
+the ratio, and when it is complete.
+
+**Missing meter data.** The record is first put on its full regular grid, so an interval missing from the index
+counts as missing. A window with a missing meter value has a balance that cannot close: \(\Delta E\) spans the whole
+window while the metered energy does not, and counting the gap as zero energy biases the RTE (by a third or more
+when a discharge hour is lost). Such a window gets NaN ratios and `valid = False`. `min_coverage` (default 1.0) can
+accept a share of missing intervals, knowingly. The equivalent cycles of `window_rte` count the charge energy of the
+PCS, as a qualifier of the window; the warranty throughput of `bess.throughput` counts the discharge by default.
 
 ## LTSA availability
 
@@ -45,7 +52,9 @@ $$
 Events from the operator's log decide how an interval counts: **deemed available** (\(a_i = 1\): a grid-operator
 instruction, a grid outage, an owner request), **excluded** (force majeure, the capacity test), **allowance**
 (planned maintenance excluded until the yearly allowance, pro-rated to the period, is used up) or **counted**.
-When events overlap, excluded wins over deemed available, which wins over allowance. Then
+When events overlap, excluded wins over deemed available, which wins over allowance. An event counts for the
+share of each interval it covers: on an hourly grid, an outage excused by a grid instruction from 02:05 leaves five
+minutes of the 02:00 interval counted. Then
 
 $$
 A = \frac{\sum_{i \notin \mathrm{excl}} a_i\, \Delta t}{\sum_{i \notin \mathrm{excl}} \Delta t}.
@@ -69,7 +78,8 @@ reversals, which the tests check for random signals.
 ## Capacity test
 
 The discharged energy of the test is integrated over the whole contiguous discharge around the run at the test
-power, corrected to the reference temperature with a linear coefficient \(\alpha\):
+power (a missing value at its edge is an error: the energy would be cut short), corrected to the reference
+temperature with a linear coefficient \(\alpha\):
 
 $$
 E_\mathrm{corr} = \frac{E_\mathrm{meas}}{1 + \alpha\,(T_\mathrm{test} - T_\mathrm{ref})}

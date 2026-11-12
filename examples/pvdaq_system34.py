@@ -85,6 +85,7 @@ def analyse(frame: pd.DataFrame) -> dict[str, pd.DataFrame]:
     # expected power for the energy basis from a simple temperature-corrected model, scaled to the
     # plant's median ratio of measured to modelled power in daylight
     model = P_STC_KW * poa / 1000.0 * (1.0 + GAMMA * (t_cell - 25.0))
+    model = model.fillna(P_STC_KW * poa / 1000.0)  # no cell temperature (frozen sensor): no temperature term
     ratio = float(np.nanmedian((p_ac / model)[day & (poa > 400).to_numpy()]))
     expected = (model * ratio).clip(upper=AC_KW)
     running = pd.DataFrame({"INV1": np.where(p_ac.isna(), np.nan, (p_ac > 0.02 * AC_KW).astype(float))},

@@ -2,7 +2,8 @@
 
 Every unit belongs to one dimension and is stored as ``(dimension, scale, offset)`` against the canonical unit
 of that dimension, so that ``canonical = value * scale + offset``. Unit names are case-insensitive and
-tolerate the usual spellings (``degC``, ``°C``, ``W/m²``, ``W/m2``).
+tolerate the usual spellings (``degC``, ``°C``, ``W/m²``, ``W/m2``); ``mw`` is read as MW, and ``mW`` or ``mWh``
+(milli, which no plant signal uses but a typo easily produces) are refused rather than read as mega.
 
 | dimension | canonical unit | other units |
 |---|---|---|
@@ -113,7 +114,10 @@ def normalise_unit(unit: str) -> str:
     >>> normalise_unit("°C")
     'degc'
     """
-    key = str(unit).strip().lower()
+    raw = str(unit).strip()
+    if raw.startswith("mW"):
+        raise ValueError(f"ambiguous unit {unit!r}: write MW (mega) or W; milliwatts are not supported")
+    key = raw.lower()
     for old, new in _ALIASES.items():
         key = key.replace(old, new)
     if key == "degk":

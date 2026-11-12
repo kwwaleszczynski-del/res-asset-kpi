@@ -141,8 +141,8 @@ def rainflow(x: ArrayLike, min_range: float = 0.0) -> pd.DataFrame:
 
     Examples
     --------
-    The ASTM E1049-85 example (loads -2, 1, -3, 5, -1, 3, -4, 4, -2) gives two full cycles of range 4 and
-    half cycles of ranges 3, 4, 8, 9, 8 and 6:
+    The ASTM E1049-85 example (loads -2, 1, -3, 5, -1, 3, -4, 4, -2) gives one full cycle of range 4 and
+    half cycles of ranges 3, 4, 6, 8, 8 and 9:
 
     >>> c = rainflow([-2, 1, -3, 5, -1, 3, -4, 4, -2])
     >>> c.groupby("depth")["count"].sum().to_dict()

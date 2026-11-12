@@ -5,6 +5,27 @@ nothing changed on the way, `validation/parity.py` runs each source project's ow
 **same inputs** and compares the results number by number. Inputs are public data (NREL PVDAQ, the Kelmarsh,
 Penmanshiel and Hill of Towie wind farms) or the source projects' synthetic plants.
 
+## What this check is, and what it is not
+
+It is a **regression check of the extraction**: it shows that the library computes what the original code
+computed. It is not an independent validation of the methods: both sides were written by the same author, and the
+correctness of each formula rests on the hand-worked tests and the property tests of the test suite.
+
+Five of the source projects have since switched to the library (pv-outage-classifier has not), so their current
+code would compare the library with itself. The check is therefore run against the commits **before** the switch:
+
+| Source project | Commit (pre-migration) | Date |
+|---|---|---|
+| pv-budget-bridge | `1f71d45` | 2026-10-28 |
+| wind-downtime-availability | `3e29402` | 2026-10-27 |
+| wind-power-curve-kelmarsh | `9046a8f` | 2026-10-21 |
+| wind-om-reliability | `facfb66` | 2026-10-28 |
+| bess-ops-warranty | `e2dd164` | 2026-10-28 |
+
+Version 0.1.1 was checked against the same commits with the same result. Its fixes concern missing data and
+partial events (see the changelog), which the original code did not handle either; on the complete inputs of these
+checks the numbers are unchanged.
+
 | Source project | What the library took from it |
 |---|---|
 | [pv-budget-bridge](https://github.com/kwwaleszczynski-del/pv-budget-bridge) | PR family, contract availability and PR tests, energy bridge, input schema and DST handling |
@@ -81,16 +102,19 @@ detector, while the library takes the same information as masks of running, excl
 
 ## Running it
 
-Each check runs in the Python environment of its source project, which has that project's dependencies, and
-reads that project's data folder:
+Export the pinned commit of each source project to a folder of its own, then run each check in a Python
+environment with that project's dependencies, reading that project's data folder:
 
 ```bash
-python validation/parity.py pv          --source ../pv-budget-bridge --data ../pv-budget-bridge/data
-python validation/parity.py wind-avail  --source ../wind-downtime-availability
-python validation/parity.py power-curve --source ../wind-power-curve-kelmarsh
-python validation/parity.py reliability --source ../wind-om-reliability --data ../wind-power-curve-kelmarsh/data
-python validation/parity.py bess        --source ../bess-ops-warranty
+git -C ../pv-budget-bridge archive 1f71d45 | tar -x -C pinned/pv-budget-bridge
+python validation/parity.py pv          --source pinned/pv-budget-bridge --data ../pv-budget-bridge/data
+python validation/parity.py wind-avail  --source pinned/wind-downtime-availability
+python validation/parity.py power-curve --source pinned/wind-power-curve-kelmarsh --data ../wind-power-curve-kelmarsh/data
+python validation/parity.py reliability --source pinned/wind-om-reliability --data ../wind-power-curve-kelmarsh/data
+python validation/parity.py bess        --source pinned/bess-ops-warranty
 ```
+
+The script refuses a source tree that already imports the library.
 
 The script exits with an error when any relative difference exceeds \(10^{-9}\) or a missing value appears on
 one side only.

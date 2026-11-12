@@ -222,14 +222,16 @@ def discharge_segment(
     Raises
     ------
     ValueError
-        If the series never reaches the test power.
+        If the series never reaches the test power, or a missing value borders the discharge (the test energy
+        would be cut short).
 
     Examples
     --------
     >>> discharge_segment([0.0, 20.0, 50.0, 50.0, 49.0, 10.0, 0.0], 0.25, 50.0)
     (1, 5, 44.75)
     """
-    p = np.nan_to_num(np.asarray(p_discharge, dtype=float))
+    raw = np.asarray(p_discharge, dtype=float)
+    p = np.nan_to_num(raw)
     runs = _steady_runs(p, test_power, steady_tolerance)
     if not runs:
         raise ValueError("no discharge at the test power")
@@ -239,4 +241,6 @@ def discharge_segment(
         lo -= 1
     while hi < len(p) - 1 and p[hi + 1] > eps:
         hi += 1
+    if (lo > 0 and np.isnan(raw[lo - 1])) or (hi < len(p) - 1 and np.isnan(raw[hi + 1])):
+        raise ValueError("missing power next to the test discharge: its energy cannot be integrated")
     return int(lo), int(hi), float(p[lo:hi + 1].clip(min=0).sum() * interval_h)

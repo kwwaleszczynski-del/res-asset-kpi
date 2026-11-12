@@ -14,15 +14,21 @@ dE >= 0:  RTE = (E_out + eta dE) / E_in          what is left in store is worth 
 dE <  0:  RTE = E_out / (E_in + |dE| / eta)      what was taken from store would need |dE| / eta to refill
 ```
 
-``eta`` is given or found as ``sqrt(RTE)`` of the whole record by fixed-point iteration. With ``dE = 0`` both
+``eta`` is given or found as ``sqrt(RTE)`` of the complete windows by fixed-point iteration. With ``dE = 0`` both
 lines reduce to ``E_out / E_in``. The stored energy is read at the instants that bound each window (the start of
 the window and the start of the next one).
+
+The record is put on its complete regular grid first, so that an interval missing from the index counts as missing.
+A window with a missing meter reading has an energy balance that does not close: the change of the stored energy covers
+the whole window while the metered energy does not. Its ratios are therefore NaN unless the caller accepts a lower
+``min_coverage`` (default 1.0, every interval).
 
 Any consistent units work: MW and MWh, or kW and kWh.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Literal
 
 import numpy as np
@@ -33,6 +39,7 @@ from res_asset_kpi import timeseries
 
 __all__ = ["MIN_EFC", "auto_eta", "corrected_rte", "interval_flows", "stored_energy", "window_keys", "window_rte"]
 
+log = logging.getLogger(__name__)
 AuxMetering = Literal["behind_meter", "separate", "none"]
 WindowFreq = Literal["D", "M", "Q", "Y", "CY"]
 MIN_EFC: dict[str, float] = {"D": 0.3, "M": 5.0, "Q": 15.0, "Y": 50.0, "CY": 50.0}
@@ -187,6 +194,20 @@ def _window_sums(flows: pd.DataFrame, keys: pd.Series) -> pd.DataFrame:
     return sums
 
 
+def _full_grid(site: pd.DataFrame) -> pd.DataFrame:
+    """The site frame on its complete regular grid: intervals missing from the index become rows of NaN."""
+    idx = pd.DatetimeIndex(site.index)
+    if len(idx) < 2:
+        return site
+    step = timeseries.infer_step(idx)
+    grid = pd.date_range(idx.min(), idx.max(), freq=step, name=site.index.name)
+    if len(grid) == len(idx) and grid.equals(idx):
+        return site
+    full = site.reindex(grid)
+    full.attrs = dict(site.attrs)
+    return full
+
+
 def window_rte(
     site: pd.DataFrame,
     freq: WindowFreq = "M",
@@ -198,7 +219,7 @@ def window_rte(
     contract_start: pd.Timestamp | str | None = None,
     eta: float | Literal["auto"] = "auto",
     min_efc: float | None = None,
-    min_coverage: float = 0.95,
+    min_coverage: float = 1.0,
 ) -> pd.DataFrame:
     """Energy in and out and RTE per window, with and without the auxiliaries.
 
@@ -220,20 +241,23 @@ def window_rte(
     contract_start : pandas.Timestamp or str, optional
         Start of contract year 1 for ``freq="CY"``.
     eta : float or "auto", default "auto"
-        One-way efficiency for the correction; ``auto`` = ``sqrt(RTE)`` of the whole record (excluding the
-        auxiliaries when possible).
+        One-way efficiency for the correction; ``auto`` = ``sqrt(RTE)`` of the windows that meet
+        ``min_coverage`` (excluding the auxiliaries when possible).
     min_efc : float, optional
         Minimum equivalent full cycles for ``valid`` (default [`MIN_EFC`][res_asset_kpi.bess.efficiency.MIN_EFC]
         of the window).
-    min_coverage : float, default 0.95
-        Minimum share of intervals with a meter reading for ``valid``.
+    min_coverage : float, default 1.0
+        Minimum share of the window's intervals with a meter reading. Below it the ratios are NaN and ``valid``
+        is False; a lower value accepts the bias of the missing energy knowingly.
 
     Returns
     -------
     pandas.DataFrame
-        Per window: summed flows, ``coverage``, ``hours``, ``stored_start``, ``stored_end``, ``d_stored``,
-        ``rte_raw`` (uncorrected ``E_out / E_in``), ``rte`` (including auxiliaries), ``rte_excl_aux``,
-        ``efc`` (PCS input energy / reference energy), ``eta`` and ``valid``.
+        Per window: summed flows, ``coverage`` (share of the window's intervals on the full grid with a meter
+        reading), ``hours``, ``stored_start``, ``stored_end``, ``d_stored``, ``rte_raw`` (uncorrected
+        ``E_out / E_in``), ``rte`` (including auxiliaries), ``rte_excl_aux``, ``efc`` (charge energy of the PCS /
+        reference energy: the cycling that qualifies the window, not the warranty throughput of
+        [`throughput`][res_asset_kpi.bess.cycles.throughput]), ``eta`` and ``valid``.
 
     Examples
     --------
@@ -248,22 +272,29 @@ def window_rte(
     window
     2024-06-01 100.0   78.0       2.0     0.78  0.799
     """
+    if not 0.0 < min_coverage <= 1.0:
+        raise ValueError("min_coverage must be in (0, 1]")
+    site = _full_grid(site)
     flows = interval_flows(site, aux_metering, soc_energy)
     keys = window_keys(pd.DatetimeIndex(site.index), freq, tz, contract_start)
     s = _window_sums(flows, keys)
     have_pcs = bool(s["e_in_pcs"].notna().any())
+    complete = (s["coverage"] >= min_coverage - 1e-12) & s["d_stored"].notna()
     if eta == "auto":
-        total = _window_sums(flows, pd.Series("all", index=flows.index)).iloc[0]
         cols = ("e_out_pcs", "e_in_pcs") if have_pcs else ("e_out", "e_in")
-        eta = auto_eta(total[cols[0]], total[cols[1]], total["d_stored"])
+        ok = s[complete]
+        if len(ok) < len(s):
+            log.warning("one-way efficiency from %d of %d windows (the others lack data)", len(ok), len(s))
+        eta = auto_eta(float(ok[cols[0]].sum()), float(ok[cols[1]].sum()), float(ok["d_stored"].sum()))
     eta_v = float(eta)
     e_in_incl = s["e_in"] + s["e_aux"] if aux_metering == "separate" and s["e_aux"].notna().any() else s["e_in"]
-    s["rte_raw"] = s["e_out"] / s["e_in"].where(s["e_in"] > 0)
-    s["rte"] = corrected_rte(s["e_out"], e_in_incl, s["d_stored"], eta_v)
-    s["rte_excl_aux"] = corrected_rte(s["e_out_pcs"], s["e_in_pcs"], s["d_stored"], eta_v) if have_pcs else np.nan
+    s["rte_raw"] = (s["e_out"] / s["e_in"].where(s["e_in"] > 0)).where(complete)
+    s["rte"] = np.where(complete, corrected_rte(s["e_out"], e_in_incl, s["d_stored"], eta_v), np.nan)
+    s["rte_excl_aux"] = np.where(complete, corrected_rte(s["e_out_pcs"], s["e_in_pcs"], s["d_stored"], eta_v),
+                                 np.nan) if have_pcs else np.nan
     basis = s["e_in_pcs"] if have_pcs else s["e_in"]
     s["efc"] = basis / reference_energy
     s["eta"] = eta_v
     need = MIN_EFC.get(freq, 0.0) if min_efc is None else min_efc
-    s["valid"] = (s["efc"] >= need) & (s["coverage"] >= min_coverage) & s["d_stored"].notna()
+    s["valid"] = (s["efc"] >= need) & complete
     return s

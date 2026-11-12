@@ -14,7 +14,9 @@ PR_wc  = sum E_i / sum (P_STC G_i / G_STC [1 + gamma (T_c,i - T_typ)]) dt
 ``T_typ`` is the irradiance-weighted mean cell temperature of a typical year (e.g. the budget's TMY), so that the
 annual ``PR_wc`` stays close to the annual plain PR while the monthly values no longer swing with the seasons.
 
-Intervals with a missing power or irradiance are left out of numerator and denominator alike. When cell
+Intervals with a missing power or irradiance are left out of numerator and denominator alike. Negative power (the
+plant's own consumption at night) counts in ``E`` like any other interval; for a PR of daylight operation pass a
+``mask`` such as ``poa_wm2 > 50``, which also keeps the night's sensor offsets out of the reference yield. When cell
 temperatures are given, intervals without one are left out of all three ratios, so that the three describe the
 same intervals.
 """
@@ -180,6 +182,8 @@ def performance_ratio(
     p_ac_kw: ArrayLike, poa_wm2: ArrayLike, p_stc_kw: float, interval_h: float, mask: ArrayLike | None = None
 ) -> float:
     """Plain performance ratio, ``sum E / sum (P_STC G / G_STC) dt``.
+
+    Without a ``mask`` every interval counts, including night intervals with negative power (own consumption).
 
     Examples
     --------

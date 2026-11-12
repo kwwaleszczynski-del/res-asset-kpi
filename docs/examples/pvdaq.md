@@ -50,11 +50,14 @@ the temperature-corrected ratios use only intervals with a real reading.
 Daylight intervals (POA above 50 W/m²); \(T_\mathrm{typ} = 56.1\) °C is the irradiance-weighted cell temperature of
 the three years, standing in for a typical year. The inverter counts as running above 2 % of its rating; the
 expected power for the energy basis comes from a temperature-corrected model scaled to the plant's median ratio of
-measured to modelled power.
+measured to modelled power; where the frozen ambient sensor leaves no cell temperature, the model drops the
+temperature term rather than leave the interval without expected power (which would make the energy availability
+NaN). About 1 160 capacity-weighted hours have a unit state but no irradiance value; they are left out of the
+availability and reported in `poa_missing_h` instead of passing for night.
 
 | year | energy (MWh) | H_POA (kWh/m²) | PR | PR_25 | PR_wc | A_time | A_energy |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| 2016 | 175.0 | 2039 | 0.585 | 0.677 | 0.583 | 0.948 | 0.946 |
+| 2016 | 175.0 | 2039 | 0.585 | 0.677 | 0.583 | 0.948 | 0.953 |
 | 2017 | 178.3 | 1988 | 0.612 | 0.712 | 0.612 | 0.994 | 0.999 |
 | 2018 | 124.3 | 1405 | 0.603 | 0.698 | 0.601 | 0.994 | 0.999 |
 
@@ -65,9 +68,9 @@ ratio removes the summer dip of the plain one:
 | month | PR | PR_25 | PR_wc | A_time | A_energy | lost (kWh) |
 |---|---:|---:|---:|---:|---:|---:|
 | 2016-05 | 0.632 | 0.730 | 0.628 | 0.994 | 0.999 | 15 |
-| 2016-06 | 0.119 | 0.150 | 0.127 | 0.195 | 0.202 | 10 147 |
-| 2016-07 | 0.595 | 0.764 | 0.648 | 0.990 | 0.998 | 42 |
-| 2016-08 | 0.605 | 0.753 | 0.641 | 0.989 | 0.999 | 24 |
+| 2016-06 | 0.119 | 0.150 | 0.127 | 0.195 | 0.202 | 9 723 |
+| 2016-07 | 0.595 | 0.764 | 0.648 | 0.990 | 0.998 | 40 |
+| 2016-08 | 0.605 | 0.753 | 0.641 | 0.989 | 0.999 | 23 |
 
 June 2016 is the inverter outage that pv-budget-bridge reports as the main availability loss of the year; the
 energy basis prices it at about 10 MWh. 2018 holds fewer months of data.

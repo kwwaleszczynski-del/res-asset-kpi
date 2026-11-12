@@ -221,6 +221,7 @@ def regularise(
     source_step: str | pd.Timedelta | None = None,
     label: Label = "start",
     how: Aggregation = "mean",
+    min_share: float = 1.0,
 ) -> pd.Series:
     """Put one signal on a regular UTC grid whose time stamps mark the start of each interval.
 
@@ -239,6 +240,10 @@ def regularise(
         (energy, precipitation; spread evenly when the grid is finer), ``instant`` for states read at an
         instant (state of charge, stored energy; not shifted by ``label``, interpolated linearly onto a finer
         grid), ``circular`` for directions in degrees.
+    min_share : float, default 1.0
+        On a coarser grid: the share of the source intervals an output interval needs for a ``mean`` or
+        ``circular`` value. A ``sum`` always needs all of them, since a partial sum would read as a smaller amount.
+        Output intervals short of it are NaN.
 
     Returns
     -------
@@ -260,6 +265,8 @@ def regularise(
     Freq: 15min, dtype: float64
     """
     target = check_step(step)
+    if not 0.0 < min_share <= 1.0:
+        raise ValueError("min_share must be in (0, 1]")
     idx = pd.DatetimeIndex(values.index)
     if idx.tz is None:
         raise ValueError("the index must be time-zone aware; convert it with to_utc()")
@@ -280,7 +287,12 @@ def regularise(
             grid = pd.date_range(s.index.min().ceil(target), s.index.max(), freq=target)
             s = s.reindex(grid)
         else:
-            s = _aggregate(s, how, s.index.floor(target))
+            keys = s.index.floor(target)
+            present = s.notna().groupby(keys).sum()
+            n = int(round(target / src))
+            need = n if how == "sum" else int(np.ceil(min_share * n - 1e-9))
+            s = _aggregate(s, how, keys)
+            s = s.where(present.reindex(s.index).to_numpy() >= need)
     elif src > target:
         n = int(round(src / target))
         if how == "instant":  # a state is known at its instants only, not until the end of an interval

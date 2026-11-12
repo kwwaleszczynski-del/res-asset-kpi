@@ -101,9 +101,10 @@ def energy_bridge(
         Ordered ratios actual / budget of the conditions outside the operator's control, e.g.
         ``{"irradiance": r_irr, "temperature": r_T, "degradation": r_D}``.
     losses_actual : mapping of str to float or array-like
-        Ordered measured loss fractions ``l_k`` (0..1), e.g. ``{"soiling": 0.021, "availability": 0.004}``.
+        Ordered measured loss fractions ``l_k`` in [0, 1], e.g. ``{"soiling": 0.021, "availability": 0.004}``;
+        1 is a total loss (a month without production).
     losses_budget : mapping of str to float or array-like
-        Budgeted loss fractions ``b_k`` with the same keys (0 where the budget assumes none).
+        Budgeted loss fractions ``b_k`` in [0, 1) with the same keys (0 where the budget assumes none).
     method : {"sequential", "shapley"}, default "sequential"
         Allocation method (see the module description).
     min_keep : float, default 0.05
@@ -141,10 +142,12 @@ def energy_bridge(
     r = {k: _column(v, n, f"weather[{k!r}]") for k, v in weather.items()}
     la = {k: _column(v, n, f"losses_actual[{k!r}]") for k, v in losses_actual.items()}
     lb = {k: _column(losses_budget[k], n, f"losses_budget[{k!r}]") for k in losses_actual}
-    for name, d in (("losses_actual", la), ("losses_budget", lb)):
-        for k, v in d.items():
-            if ((v < 0) | (v >= 1)).any():
-                raise ValueError(f"{name}[{k!r}] must be in [0, 1)")
+    for k, v in la.items():
+        if ((v < 0) | (v > 1)).any():
+            raise ValueError(f"losses_actual[{k!r}] must be in [0, 1]")
+    for k, v in lb.items():
+        if ((v < 0) | (v >= 1)).any():
+            raise ValueError(f"losses_budget[{k!r}] must be in [0, 1)")
     out: dict[str, np.ndarray] = {}
     acc = eb.copy()
     for k, v in r.items():
@@ -175,6 +178,10 @@ def energy_bridge(
         residual_factor = np.divide(ea, explained, out=np.ones(n), where=explained > 0)
         factors = [r[k] for k in r] + loss_ratios + [residual_factor]
         sh = np.array([shapley_product(eb[i], [f[i] for f in factors]) for i in range(n)])
+        no_budget = ~(eb > 0)
+        if no_budget.any():  # a product of ratios cannot start from zero: the allocation is undefined
+            log.warning("%d period(s) without budget energy: Shapley bars undefined (NaN)", int(no_budget.sum()))
+            sh[no_budget] = np.nan
         for j, k in enumerate([*bars, "residual"]):
             out[k] = sh[:, j]
     frame = pd.DataFrame(out, index=index)

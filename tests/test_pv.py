@@ -168,8 +168,10 @@ def test_bridge_shapley_and_fallback(caplog: pytest.LogCaptureFixture) -> None:
         pv.energy_bridge(1.0, 1.0, {}, {"a": 0.1}, {"b": 0.1})
     with pytest.raises(ValueError, match="method"):
         pv.energy_bridge(1.0, 1.0, {}, {}, {}, method="lmdi")
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        pv.energy_bridge(1.0, 1.0, {}, {"a": 1.1}, {"a": 0.0})
     with pytest.raises(ValueError, match=r"\[0, 1\)"):
-        pv.energy_bridge(1.0, 1.0, {}, {"a": 1.0}, {"a": 0.0})
+        pv.energy_bridge(1.0, 1.0, {}, {"a": 0.5}, {"a": 1.0})
     with pytest.raises(ValueError, match="one value per period"):
         pv.energy_bridge([1.0, 2.0], [1.0, 2.0], {"x": [1.0, 1.0, 1.0]}, {}, {})
 
@@ -189,12 +191,25 @@ fraction = st.floats(0.0, 0.6)
     st.lists(st.tuples(fraction, fraction), min_size=0, max_size=6),
     st.sampled_from(["sequential", "shapley"]),
 )
-def test_bridge_closes_exactly(e_b: float, e_a: float, ratios: list[float],
-                               losses: list[tuple[float, float]], method: str) -> None:
+def test_bridge_bars_follow_the_algebra(e_b: float, e_a: float, ratios: list[float],
+                                        losses: list[tuple[float, float]], method: str) -> None:
+    """Every bar recomputed from its own formula; the closure follows for Shapley, which no bar absorbs."""
     weather = {f"w{i}": r for i, r in enumerate(ratios)}
     la = {f"l{i}": a for i, (a, _) in enumerate(losses)}
     lb = {f"l{i}": b for i, (_, b) in enumerate(losses)}
-    b = pv.energy_bridge(e_b, e_a, weather, la, lb, method=method)
-    bars = [*weather, *la, "residual"]
-    total = float(b[bars].sum(axis=1).iloc[0])
-    assert total == pytest.approx(e_a - e_b, rel=1e-9, abs=1e-6 * max(e_a, e_b))
+    b = pv.energy_bridge(e_b, e_a, weather, la, lb, method=method).iloc[0]
+    tol = {"rel": 1e-9, "abs": 1e-6 * max(e_a, e_b)}
+    if method == "shapley":
+        total = float(b[[*weather, *la, "residual"]].sum())
+        assert total == pytest.approx(e_a - e_b, **tol)
+        return
+    e_w = e_b * float(np.prod(ratios)) if ratios else e_b
+    assert sum(b[k] for k in weather) == pytest.approx(e_w - e_b, **tol)
+    x_a = b["potential_actual"]
+    x_b = e_w / float(np.prod([1 - v for v in lb.values()])) if lb else e_w
+    keep_a = keep_b = 1.0
+    for k in la:
+        assert b[k] == pytest.approx(x_b * keep_b * lb[k] - x_a * keep_a * la[k], **tol)
+        keep_a *= 1 - la[k]
+        keep_b *= 1 - lb[k]
+    assert b["residual"] == pytest.approx(e_a - x_b + x_a - x_a * keep_a, **tol)

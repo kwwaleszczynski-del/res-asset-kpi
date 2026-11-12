@@ -1,10 +1,12 @@
 """Numerical parity of res-asset-kpi with the projects its code was extracted from.
 
 Every check runs a source project's own code and the library on the same inputs and reports the largest
-absolute and relative difference. The source projects are public (github.com/kwwaleszczynski-del); run each
-check with the Python environment of its source project, which has that project's dependencies, e.g.:
+absolute and relative difference: a regression check of the extraction, not an independent validation. Five source
+projects now import the library, so ``--source`` must be a tree of the commit before the switch (see
+docs/validation.md for the commits; ``git archive <commit> | tar -x``). Run each check with a Python environment
+that has the source project's dependencies, e.g.:
 
-    <pv-budget-bridge>/.venv/Scripts/python validation/parity.py pv --source <pv-budget-bridge> --data <its data>
+    python validation/parity.py pv --source pinned/pv-budget-bridge --data ../pv-budget-bridge/data
 
 Checks and their sources:
 
@@ -167,7 +169,8 @@ def parity_wind_availability(source: Path) -> None:
         for name in ("iec_operational", "oem_warranty"):
             allowance = src.MAINTENANCE_ALLOWANCE_H[name]
             s = src.kpis(g, src.CONTRACTS[name], allowance)
-            r = wind.availability(g, name, allowance_h=allowance)
+            # the source scales the allowance by one turbine-year whatever the totals cover
+            r = wind.availability(g, name, allowance_h=allowance, n_turbine_years=1.0)
             s_vals += [s["time_availability"], s["energy_availability"], s["lost_unavailable_mwh"]]
             l_vals += [r.time, r.energy, r.lost_unavailable_kwh / 1000]
     compare("wind: time, energy availability and lost energy from category totals", s_vals, l_vals,
@@ -179,7 +182,8 @@ def parity_wind_availability(source: Path) -> None:
     for r in merged.itertuples():
         g = tot[(tot["farm"] == r.farm) & (tot["detector"] == r.detector) & (tot["classifier"] == r.classifier)
                 & (tot["group"] == r.group)]
-        lib.append(wind.availability(g, r.contract, allowance_h=src.MAINTENANCE_ALLOWANCE_H[r.contract]).time)
+        lib.append(wind.availability(g, r.contract, allowance_h=src.MAINTENANCE_ALLOWANCE_H[r.contract],
+                                     n_turbine_years=1.0).time)
     compare("wind: time availability vs the published turbine-year table", merged["time_availability"], lib)
 
 
@@ -356,7 +360,10 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     for name in ("pv_budget", "wind_om", "wind_downtime", "wind_power_curve", "bess_ops", "py.warnings"):
         logging.getLogger(name).setLevel(logging.ERROR)
-    sys.path[:0] = [str(LIB), str(args.source.resolve() / "src")]
+    src_tree = args.source.resolve() / "src"
+    if any("res_asset_kpi" in f.read_text(encoding="utf-8", errors="ignore") for f in src_tree.rglob("*.py")):
+        ap.error(f"{src_tree} imports res_asset_kpi: check out the commit before the switch (docs/validation.md)")
+    sys.path[:0] = [str(LIB), str(src_tree)]
     data = args.data.resolve() if args.data else args.source.resolve() / "data"
     {"pv": lambda: parity_pv(data), "wind-avail": lambda: parity_wind_availability(args.source.resolve()),
      "power-curve": lambda: parity_power_curve(data),

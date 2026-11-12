@@ -100,8 +100,8 @@ def test_regularise_down_up_and_kinds() -> None:
     idx = pd.date_range("2024-06-01 00:00", periods=4, freq="15min", tz="UTC")
     mean = timeseries.regularise(pd.Series([1.0, 2.0, 3.0, 6.0], index=idx), "1h")
     assert mean.tolist() == [3.0]
-    energy = timeseries.regularise(pd.Series([1.0, 2.0, np.nan, 6.0], index=idx), "1h", how="sum")
-    assert energy.tolist() == [9.0]
+    energy = timeseries.regularise(pd.Series([1.0, 2.0, 3.0, 6.0], index=idx), "1h", how="sum")
+    assert energy.tolist() == [12.0]
     hourly = pd.Series([4.0, 8.0], index=pd.date_range("2024-06-01", periods=2, freq="1h", tz="UTC"))
     spread = timeseries.regularise(hourly, "15min", how="sum")
     assert spread.tolist() == [1.0] * 4 + [2.0] * 4

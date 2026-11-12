@@ -27,7 +27,8 @@ columns:
 ```
 
 A long table whose names or units differ is mapped the same way, with `signals` (raw name -> canonical signal
-and unit) and `devices` (renames). Both example mappings ship with the package
+and unit) and `devices` (renames). Both forms accept `scale` and `sign: -1` (a meter that counts import as
+positive). Both example mappings ship with the package
 (`contracts.example_path("mapping_wide")`, `contracts.example_path("mapping_long")`).
 
 ```python
@@ -69,12 +70,15 @@ output grid by its aggregation rule:
 | `instant` | state of charge, stored energy | value at the grid instant | linear interpolation |
 | `circular` | wind direction, nacelle position | circular mean | value repeated |
 
-Steps that do not divide each other (10 and 15 minutes) are refused rather than approximated. Downsampled means
-use the intervals present; check the [coverage](quality.md) before trusting a period.
+Steps that do not divide each other (10 and 15 minutes) are refused rather than approximated. On a coarser grid
+an interval needs all its source intervals: a partial sum would read as a smaller amount, a mean of one surviving
+sample as a full hour. `min_share` (default 1.0) relaxes this for means; sums stay strict. Check the
+[coverage](quality.md) of what is left before trusting a period.
 
 ## Units
 
-`units.convert` converts between units of one dimension and refuses to mix dimensions; the mapping converts every
+`units.convert` converts between units of one dimension and refuses to mix dimensions. Names are
+case-insensitive (`mw` is MW), except that `mW` and `mWh` are refused as ambiguous; the mapping converts every
 column to the canonical unit of its signal once. Function parameters carry their unit in the name
 (`p_stc_kw`, `poa_wm2`, `interval_h`, `temp_c`). Battery functions accept any consistent pair (MW and MWh, or kW
 and kWh).
