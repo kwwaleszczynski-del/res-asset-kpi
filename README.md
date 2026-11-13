@@ -138,8 +138,8 @@ their READMEs unchanged.
 ## Citing
 
 Please cite the software through its Zenodo DOI, [10.5281/zenodo.23742958](https://doi.org/10.5281/zenodo.23742958)
-(all versions; each release also has its own DOI, e.g. 0.1.0:
-[10.5281/zenodo.23742959](https://doi.org/10.5281/zenodo.23742959)). See also [`CITATION.cff`](CITATION.cff).
+(all versions; each release also has its own DOI, e.g. 0.1.1:
+[10.5281/zenodo.24189227](https://doi.org/10.5281/zenodo.24189227)). See also [`CITATION.cff`](CITATION.cff).
 
 ## License
 
