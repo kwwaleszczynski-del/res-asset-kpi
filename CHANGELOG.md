@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
-## [0.1.1] - unreleased
+## [0.1.1] - 2026-11-13
 
 Fixes from an independent review. Missing data no longer turn into silent zeros; on complete data every result is
 unchanged (the regression check against the original projects still reproduces them exactly).

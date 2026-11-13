@@ -9,7 +9,7 @@ carries a `CITATION.cff` file (GitHub shows a "Cite this repository" button).
 @software{waleszczynski_res_asset_kpi,
   author  = {Waleszczyński, Konrad},
   title   = {res-asset-kpi: key performance indicators for operating PV, wind and battery assets},
-  version = {0.1.0},
+  version = {0.1.1},
   doi     = {10.5281/zenodo.23742958},
   year    = {2026},
   url     = {https://github.com/kwwaleszczynski-del/res-asset-kpi},
