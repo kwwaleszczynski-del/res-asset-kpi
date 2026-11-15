@@ -40,6 +40,10 @@ excused, scheduled maintenance allowance 60 h, missing information counted as av
 categories, which shows what a misclassification costs: counting grid stops as turbine faults lowers a warranty
 availability by as much as the stops last.
 
+`category_totals` assumes two things when data are missing, and says so in a warning: an interval without a category
+counts as a forced outage (the conservative choice), and a missing lost energy counts as 0 kWh, which understates the
+loss of intervals outside full performance.
+
 ## Power curve
 
 **Air density** of dry air from temperature and pressure (the ISO standard atmosphere at the site elevation when

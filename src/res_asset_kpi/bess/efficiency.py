@@ -14,9 +14,11 @@ dE >= 0:  RTE = (E_out + eta dE) / E_in          what is left in store is worth 
 dE <  0:  RTE = E_out / (E_in + |dE| / eta)      what was taken from store would need |dE| / eta to refill
 ```
 
-``eta`` is given or found as ``sqrt(RTE)`` of the complete windows by fixed-point iteration. With ``dE = 0`` both
-lines reduce to ``E_out / E_in``. The stored energy is read at the instants that bound each window (the start of
-the window and the start of the next one).
+``eta`` is given or found as ``sqrt(RTE)`` of the complete windows by fixed-point iteration. When it cannot be
+found (no complete window, or energies that give no positive RTE) it is NaN with a warning, and the ratios that
+need it are NaN: no default value is assumed. With ``dE = 0`` both lines reduce to ``E_out / E_in``, whatever
+``eta``. The stored energy is read at the instants that bound each window (the start of the window and the start
+of the next one).
 
 The record is put on its complete regular grid first, so that an interval missing from the index counts as missing.
 A window with a missing meter reading has an energy balance that does not close: the change of the stored energy covers
@@ -56,7 +58,8 @@ def corrected_rte(e_out: ArrayLike, e_in: ArrayLike, d_stored: ArrayLike, eta: f
     d_stored : array-like
         Change of stored energy over each window (end minus start); NaN gives NaN.
     eta : float
-        One-way efficiency between the meter and the store.
+        One-way efficiency between the meter and the store. A NaN ``eta`` gives NaN wherever the correction is
+        needed (``d_stored`` not zero); a window that ends at its starting state does not depend on it.
 
     Examples
     --------
@@ -69,26 +72,52 @@ def corrected_rte(e_out: ArrayLike, e_in: ArrayLike, d_stored: ArrayLike, eta: f
     d = np.nan_to_num(de)
     gain = d > 0
     num = eo + np.where(gain, eta * d, 0.0)
-    den = ei + np.where(gain, 0.0, -d / eta)
+    den = ei + np.where(d < 0, -d / eta, 0.0)
     with np.errstate(divide="ignore", invalid="ignore"):
         r = np.where(den > 0, num / den, np.nan)
     return np.where(np.isnan(de), np.nan, r)
 
 
 def auto_eta(e_out: float, e_in: float, d_stored: float, iterations: int = 50) -> float:
-    """One-way efficiency ``sqrt(RTE)`` consistent with the corrected RTE of the whole record.
+    """One-way efficiency ``sqrt(RTE)`` consistent with the corrected RTE of the given energies.
+
+    Parameters
+    ----------
+    e_out, e_in, d_stored : float
+        Energy discharged and charged, and change of stored energy, summed over the windows to learn from
+        (complete windows only: a missing ``d_stored`` makes the sum undefined).
+    iterations : int, default 50
+        Fixed-point iterations; the iteration starts at 0.95, which is not a result.
+
+    Returns
+    -------
+    float
+        The efficiency, or NaN (with a warning) when the energies do not determine it: a missing change of stored
+        energy, no charge, no discharge. There is no default value, since a constant would give plausible-looking
+        ratios from no information. When ``sqrt(RTE)`` exceeds 1 (more energy out than in) the energy signals do
+        not fit each other: a warning says so and the efficiency is limited to 1.
 
     Examples
     --------
     >>> round(auto_eta(81.0, 100.0, 0.0), 4)
     0.9
+    >>> auto_eta(80.0, 100.0, float("nan"))
+    nan
     """
     eta = 0.95
+    clamped = False
     for _ in range(iterations):
         r = float(corrected_rte([e_out], [e_in], [d_stored], eta)[0])
         if not np.isfinite(r) or r <= 0:
-            return 0.95
-        eta = min(float(np.sqrt(r)), 1.0)
+            log.warning("one-way efficiency not determined (energy out %.4g, in %.4g, change of stored energy %.4g): "
+                        "NaN returned, no default assumed", e_out, e_in, d_stored)
+            return float("nan")
+        root = float(np.sqrt(r))
+        clamped = clamped or root > 1.0
+        eta = min(root, 1.0)
+    if clamped:
+        log.warning("sqrt(RTE) exceeds 1 (energy out %.4g, in %.4g, change of stored energy %.4g): the energy "
+                    "signals do not fit each other; the one-way efficiency is limited to 1", e_out, e_in, d_stored)
     return eta
 
 
@@ -242,7 +271,9 @@ def window_rte(
         Start of contract year 1 for ``freq="CY"``.
     eta : float or "auto", default "auto"
         One-way efficiency for the correction; ``auto`` = ``sqrt(RTE)`` of the windows that meet
-        ``min_coverage`` (excluding the auxiliaries when possible).
+        ``min_coverage`` (excluding the auxiliaries when possible). NaN, with a warning, when no window does or the
+        energies give no positive RTE: the ``eta`` column is then NaN and the ratios of windows that need the
+        correction are NaN; no default value is assumed.
     min_efc : float, optional
         Minimum equivalent full cycles for ``valid`` (default [`MIN_EFC`][res_asset_kpi.bess.efficiency.MIN_EFC]
         of the window).
@@ -283,9 +314,13 @@ def window_rte(
     if eta == "auto":
         cols = ("e_out_pcs", "e_in_pcs") if have_pcs else ("e_out", "e_in")
         ok = s[complete]
-        if len(ok) < len(s):
-            log.warning("one-way efficiency from %d of %d windows (the others lack data)", len(ok), len(s))
-        eta = auto_eta(float(ok[cols[0]].sum()), float(ok[cols[1]].sum()), float(ok["d_stored"].sum()))
+        if ok.empty:
+            log.warning("no complete window: the one-way efficiency cannot be estimated (NaN, no default assumed)")
+            eta = float("nan")
+        else:
+            if len(ok) < len(s):
+                log.warning("one-way efficiency from %d of %d windows (the others lack data)", len(ok), len(s))
+            eta = auto_eta(float(ok[cols[0]].sum()), float(ok[cols[1]].sum()), float(ok["d_stored"].sum()))
     eta_v = float(eta)
     e_in_incl = s["e_in"] + s["e_aux"] if aux_metering == "separate" and s["e_aux"].notna().any() else s["e_in"]
     s["rte_raw"] = (s["e_out"] / s["e_in"].where(s["e_in"] > 0)).where(complete)

@@ -22,6 +22,7 @@ presets are illustrations, not readings of any agreement.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 
@@ -41,6 +42,8 @@ __all__ = [
     "category_totals",
     "remap",
 ]
+
+log = logging.getLogger(__name__)
 
 AVAILABLE, UNAVAILABLE, EXCLUDED = "available", "unavailable", "excluded"
 _YEAR_H = 8760.0  # hours of one turbine-year for the allowance
@@ -123,12 +126,14 @@ def category_totals(
     Parameters
     ----------
     category : array-like of str
-        Category of every interval (any shape, e.g. time x turbine); missing values become ``unknown``.
+        Category of every interval (any shape, e.g. time x turbine); missing values become ``unknown`` (with a
+        warning that gives their number).
     interval_h : float
         Interval length, hours.
     lost_kwh, actual_kwh : array-like, optional
         Lost energy (expected minus actual, during stops and derates) and actual energy per interval; negative
-        actual energy (own consumption) counts as zero.
+        actual energy (own consumption) counts as zero. A missing lost energy counts as 0 kWh lost; a warning gives
+        the number of such intervals outside full performance, where the loss is then understated.
     groups : array-like, optional
         Group label of every interval (same shape), e.g. turbine-year; one group ``"all"`` by default.
     unknown : str, default "forced_outage"
@@ -146,16 +151,26 @@ def category_totals(
     >>> t.set_index("category").loc[["full_performance", "forced_outage"], "hours"].round(4).tolist()
     [0.8333, 0.1667]
     """
-    cat = pd.Series(np.asarray(category, dtype=object).ravel()).fillna(unknown).astype(str)
+    raw = pd.Series(np.asarray(category, dtype=object).ravel())
+    if raw.isna().any():
+        log.warning("%d interval(s) without a category counted as %r", int(raw.isna().sum()), unknown)
+    cat = raw.fillna(unknown).astype(str)
     bad = sorted(set(cat) - set(CATEGORIES))
     if bad:
         raise ValueError(f"unknown categories {bad}; use {list(CATEGORIES)}")
     n = len(cat)
-    lost = np.zeros(n) if lost_kwh is None else np.nan_to_num(np.asarray(lost_kwh, dtype=float).ravel())
+    lost_raw = None if lost_kwh is None else np.asarray(lost_kwh, dtype=float).ravel()
+    lost = np.zeros(n) if lost_raw is None else np.nan_to_num(lost_raw)
     act = np.zeros(n) if actual_kwh is None else np.maximum(np.nan_to_num(np.asarray(actual_kwh, float).ravel()), 0)
     grp = np.full(n, "all", dtype=object) if groups is None else np.asarray(groups, dtype=object).ravel()
     if not (len(lost) == len(act) == len(grp) == n):
         raise ValueError("category, lost_kwh, actual_kwh and groups must have the same size")
+    if lost_raw is not None:
+        limited = ~cat.isin(["full_performance", "no_info"]).to_numpy()
+        n_nan = int((np.isnan(lost_raw) & limited).sum())
+        if n_nan:
+            log.warning("%d interval(s) outside full performance have no lost energy value and count as 0 kWh "
+                        "lost: the lost energy and the energy availability are understated", n_nan)
     df = pd.DataFrame({"group": grp, "category": cat.to_numpy(), "hours": interval_h, "lost_kwh": lost,
                        "actual_kwh": act})
     full = pd.MultiIndex.from_product([pd.unique(grp), list(CATEGORIES)], names=["group", "category"])

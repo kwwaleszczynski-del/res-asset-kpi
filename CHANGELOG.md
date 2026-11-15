@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
+## [Unreleased]
+
+Constants that stood in for missing information are now reported instead of assumed.
+
+### Fixed
+
+- `bess.auto_eta` no longer returns 0.95 when the energies do not determine the one-way efficiency (a missing
+  change of stored energy in the sum, no complete window, no charge or no discharge): it returns NaN with a warning.
+  A caller that summed a record whose first or last window was masked got 0.95 without notice. When `sqrt(RTE)`
+  exceeds 1 the efficiency is still limited to 1, but a warning says the energy signals do not fit each other.
+- `bess.window_rte` with `eta="auto"` has a NaN `eta` column (and a warning) when no window is complete, instead of
+  0.95; a pipeline that passed the daily efficiency on to monthly windows could carry the constant into the monthly
+  ratios. `corrected_rte` no longer depends on `eta` for a window that ends at its starting state.
+- `bess.evaluate_capacity_test` without a test temperature logs a warning and sets the new field
+  `CapacityTest.temp_corrected` (also in `as_dict`) to False. The numbers are unchanged: no correction, and no
+  temperature term in the uncertainty, which can turn an inconclusive guard-band verdict into a pass.
+- `wind.category_totals` warns about intervals without a category (counted as `unknown`, a forced outage by
+  default) and about a missing lost energy outside full performance (counted as 0 kWh).
+
+### Changed
+
+- Results on complete data are unchanged. `auto_eta` gives NaN where it gave 0.95, so a caller must handle NaN.
+
 ## [0.1.1] - 2026-11-13
 
 Fixes from an independent review. Missing data no longer turn into silent zeros; on complete data every result is

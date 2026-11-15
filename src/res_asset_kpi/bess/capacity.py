@@ -24,6 +24,7 @@ Decision rules: ``simple`` passes when ``E_corr >= E_guaranteed``; ``guard_band`
 
 from __future__ import annotations
 
+import logging
 from dataclasses import asdict, dataclass
 from typing import Literal
 
@@ -31,6 +32,8 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 __all__ = ["CapacityTest", "UncertaintyBudget", "discharge_segment", "evaluate_capacity_test", "relative_uncertainty"]
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -105,6 +108,10 @@ class CapacityTest:
         ``E_corr - E_guaranteed``.
     verdict : str
         ``pass``, ``fail`` or ``inconclusive``.
+    temp_corrected : bool
+        Whether a test temperature was given. When it is not, no temperature correction is applied and the
+        temperature term is missing from the uncertainty: a guard-band verdict is then more confident than it
+        would be with a temperature.
     """
 
     e_measured: float
@@ -115,6 +122,7 @@ class CapacityTest:
     e_guaranteed: float
     margin: float
     verdict: str
+    temp_corrected: bool = True
 
     def as_dict(self) -> dict[str, object]:
         """Fields as a dictionary."""
@@ -145,7 +153,8 @@ def evaluate_capacity_test(
     e_guaranteed : float
         Guaranteed energy at the time of the test, same unit.
     temp_c : float, optional
-        Mean cell temperature during the test; without it no correction is applied.
+        Mean cell temperature during the test. Without it (NaN) no correction is applied, the temperature term is
+        left out of the uncertainty, ``temp_corrected`` is False and a warning is logged.
     coverage_k : float, default 2.0
         Coverage factor of the expanded uncertainty.
     decision_rule : {"simple", "guard_band"}, default "guard_band"
@@ -164,7 +173,11 @@ def evaluate_capacity_test(
     >>> evaluate_capacity_test(91.0, 90.0, temp_c=30.0, decision_rule="simple").verdict
     'fail'
     """
-    factor = 1.0 + temp_coeff_per_k * (temp_c - t_ref_c) if np.isfinite(temp_c) else 1.0
+    has_temp = bool(np.isfinite(temp_c))
+    if not has_temp:
+        log.warning("capacity test evaluated without a test temperature: no temperature correction and no "
+                    "temperature term in the uncertainty (temp_corrected is False)")
+    factor = 1.0 + temp_coeff_per_k * (temp_c - t_ref_c) if has_temp else 1.0
     e_corr = e_measured / factor
     u = relative_uncertainty(meter_class_pct=meter_class_pct, ct_pct=ct_pct, vt_pct=vt_pct, temp_c=temp_c,
                              t_ref_c=t_ref_c, temp_coeff_per_k=temp_coeff_per_k,
@@ -178,7 +191,7 @@ def evaluate_capacity_test(
     else:
         raise ValueError("decision_rule must be 'simple' or 'guard_band'")
     return CapacityTest(float(e_measured), float(factor), float(e_corr), u.combined, float(big_u),
-                        float(e_guaranteed), float(e_corr - e_guaranteed), verdict)
+                        float(e_guaranteed), float(e_corr - e_guaranteed), verdict, has_temp)
 
 
 def _steady_runs(p: np.ndarray, power: float, tol: float) -> list[tuple[int, int]]:

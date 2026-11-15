@@ -27,7 +27,7 @@ def test_corrected_rte_by_hand() -> None:
     assert r[2] == pytest.approx(80 / (100 + 5 / 0.9))
     assert np.isnan(r[3])
     assert np.isnan(bess.corrected_rte([1.0], [1.0], [np.nan], 0.9)[0])
-    assert bess.auto_eta(0.0, 0.0, 0.0) == 0.95
+    assert np.isnan(bess.auto_eta(0.0, 0.0, 0.0))  # nothing to learn from: no default (was 0.95 in 0.1.1)
 
 
 def test_auto_eta_is_consistent() -> None:

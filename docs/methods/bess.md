@@ -29,6 +29,12 @@ fixed-point iteration. A window is assessed (`valid`) when it has enough equival
 5 a month by default), because on days with little throughput the auxiliaries and the SoC resolution dominate
 the ratio, and when it is complete.
 
+**No default efficiency.** When \(\eta\) cannot be found (no complete window, no charge or no discharge in them, a
+missing change of stored energy) it is NaN with a warning, and so are the ratios of windows that need the
+correction; a window that ends at its starting state does not need it. If sqrt(RTE) comes out above 1 (more energy
+out than in), the energy signals do not fit each other: a warning says so and \(\eta\) is limited to 1. A constant
+such as 0.95 would turn missing information into a plausible-looking ratio.
+
 **Missing meter data.** The record is first put on its full regular grid, so an interval missing from the index
 counts as missing. A window with a missing meter value has a balance that cannot close: \(\Delta E\) spans the whole
 window while the metered energy does not, and counting the gap as zero energy biases the RTE (by a third or more
@@ -98,6 +104,10 @@ Decision rules: **simple** passes when \(E_\mathrm{corr} \ge E_g\); **guard band
 \(E_\mathrm{corr} - U \ge E_g\), fails when \(E_\mathrm{corr} + U < E_g\) and is inconclusive in between. The
 guaranteed energy \(E_g\) can follow a warranty retention curve read at the equivalent age
 \(\max(t, \mathrm{EFC} / \mathrm{EFC}_\mathrm{year})\) (`contracts.guaranteed_retention`).
+
+Without a test temperature no correction is applied and the temperature term is missing from the uncertainty; the
+result carries `temp_corrected = False` and a warning is logged. A guard-band verdict is then more confident than
+it would be with a temperature (a result that passes without one can be inconclusive with one).
 
 ## References
 
